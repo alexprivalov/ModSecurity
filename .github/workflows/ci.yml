@@ -25,6 +25,7 @@ jobs:
           - {label: "wo libxml",  opt: "--without-libxml" }
           - {label: "wo geoip",   opt: "--without-geoip" }
           - {label: "wo ssdeep",  opt: "--without-ssdeep" }
+          - {label: "wo hs",      opt: "--without-hyperscan" }
           - {label: "with lmdb",  opt: "--with-lmdb" }
           - {label: "with pcre2", opt: "--with-pcre2" }
         exclude:
