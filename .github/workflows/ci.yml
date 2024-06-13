@@ -28,6 +28,7 @@ jobs:
           - {label: "wo hs",      opt: "--without-hyperscan" }
           - {label: "with lmdb",  opt: "--with-lmdb" }
           - {label: "with pcre2", opt: "--with-pcre2" }
+          - {label: "with hs",    opt: "--with-hyperscan" }
         exclude:
           - platform: {label: "x32"}
             configure: {label: "wo geoip"}
