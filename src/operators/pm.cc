@@ -97,7 +97,11 @@ bool Pm::evaluate(Transaction *transaction, RuleWithActions *rule,
 #ifdef MODSEC_MUTEX_ON_PM
     pthread_mutex_lock(&m_lock);
 #endif
-    rc = m_hs->search(input.c_str(), input.length(), &match);
+    std::vector<std::string> matches;
+    rc = m_hs->search(input.c_str(), input.length(), matches);
+    if (rc > 0 && matches.size() > 0) {
+        match = matches[0].c_str();
+    }
 #ifdef MODSEC_MUTEX_ON_PM
     pthread_mutex_unlock(&m_lock);
 #endif

@@ -22,19 +22,6 @@
 namespace modsecurity {
 namespace Utils {
 
-// Render the given literal as a hex-escaped pattern.
-static
-std::string makeHex(const char *pat, const size_t patLen) {
-    std::string hexPattern;
-
-    char hex[5];
-    for (size_t i = 0; i < patLen; i++) {
-        snprintf(hex, 5, "\\x%02x", (unsigned char)pat[i]);
-        hexPattern += hex;
-    }
-    return hexPattern;
-}
-
 HyperscanPattern::HyperscanPattern(const char *pat, size_t patLen,
                                    unsigned int patId) :
                                    pattern(pat), len(patLen), id(patId) {}
@@ -68,26 +55,25 @@ bool HyperscanPm::compile(std::string *error) {
         return false;
     }
 
-    // Convert literal to its hex-escaped format.
-    std::vector<std::string> hexPats;
-    for (const auto &p : patterns) {
-        hexPats.emplace_back(makeHex(p.pattern.c_str(), p.len));
-    }
-
     // The Hyperscan compiler takes its patterns in a group of arrays.
     std::vector<const char *> pats;
-    std::vector<unsigned> flags(num_patterns, HS_FLAG_CASELESS);
+    std::vector<unsigned> flags(num_patterns, HS_FLAG_DOTALL | HS_FLAG_MULTILINE | HS_FLAG_SOM_LEFTMOST);
     std::vector<unsigned> ids;
 
-    int i = 0;
     for (const auto &p : patterns) {
-        pats.emplace_back(hexPats[i++].c_str());
+        pats.emplace_back(p.pattern.c_str());
         ids.emplace_back(p.id);
     }
 
     hs_compile_error_t *compile_error = NULL;
-    hs_error_t hs_error = hs_compile_multi(&pats[0], &flags[0], &ids[0],
-        num_patterns, HS_MODE_BLOCK, NULL, &db, &compile_error);
+    hs_error_t hs_error = hs_compile_multi(&pats[0], 
+                                            &flags[0], 
+                                            &ids[0],
+                                            num_patterns, 
+                                            HS_MODE_BLOCK, 
+                                            NULL, 
+                                            &db, 
+                                            &compile_error);
 
     if (compile_error != NULL) {
         std::string message(compile_error->message);
@@ -134,39 +120,39 @@ bool HyperscanPm::compile(std::string *error) {
 
 // Context data used by Hyperscan match callback.
 struct HyperscanCallbackContext {
-    HyperscanPm *pm;
-    unsigned int num_matches;
-    unsigned int offset;
-    const char **match;
+    HyperscanPm *pm{nullptr};
+    unsigned int num_matches{0};
+    unsigned int offset{0};
+    std::vector<std::string>& matches;
+    const bool terminateAfter1stMatch{false};
 };
 
 // Match callback, called by hs_scan for every match.
 static
 int onMatch(unsigned int id, unsigned long long from, unsigned long long to,
-            unsigned int flags, void *hs_ctx) {
+            unsigned int /*flags*/, void *hs_ctx) {
     HyperscanCallbackContext *ctx = static_cast<HyperscanCallbackContext *>(hs_ctx);
 
     ctx->num_matches++;
     ctx->offset = (unsigned int)to - 1;
-    *ctx->match = ctx->pm->getPatternById(id);
-    return 1; // Terminate matching.
+
+    const char* match = ctx->pm->getPatternById(id);
+    if (match)
+        ctx->matches.push_back(match);
+
+    return ctx->terminateAfter1stMatch; // Terminate matching.
 }
 
-int HyperscanPm::search(const char *t, unsigned int tlen, const char **match) {
-    HyperscanCallbackContext ctx;
-    ctx.pm = this;
-    ctx.num_matches = 0;
-    ctx.offset = 0;
-    ctx.match = match;
+int HyperscanPm::search(const char *t, unsigned int tlen, std::vector<std::string>& matches, bool terminateAfter1stMatch) {
+    HyperscanCallbackContext ctx{this, 0, 0, matches, terminateAfter1stMatch};
 
     hs_error_t error = hs_scan(db, t, tlen, 0, scratch, onMatch, &ctx);
-
-    if (error != HS_SCAN_TERMINATED) {
+    if (error != HS_SUCCESS && error != HS_SCAN_TERMINATED) {
         // TODO add debug output
         return -1;
     }
 
-    return ctx.num_matches > 0 ? ctx.offset : -1;
+    return ctx.num_matches;
 }
 
 const char *HyperscanPm::getPatternById(unsigned int patId) const {
