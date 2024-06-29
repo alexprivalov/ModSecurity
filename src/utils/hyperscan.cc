@@ -57,7 +57,7 @@ bool HyperscanPm::compile(std::string *error) {
 
     // The Hyperscan compiler takes its patterns in a group of arrays.
     std::vector<const char *> pats;
-    std::vector<unsigned> flags(num_patterns, HS_FLAG_DOTALL | HS_FLAG_MULTILINE | HS_FLAG_SOM_LEFTMOST);
+    std::vector<unsigned> flags(num_patterns, HS_FLAG_SINGLEMATCH);
     std::vector<unsigned> ids;
 
     for (const auto &p : patterns) {
@@ -152,7 +152,7 @@ int HyperscanPm::search(const char *t, unsigned int tlen, std::vector<std::strin
         return -1;
     }
 
-    return ctx.num_matches;
+    return ctx.num_matches > 0 ? ctx.offset : -1;
 }
 
 const char *HyperscanPm::getPatternById(unsigned int patId) const {
