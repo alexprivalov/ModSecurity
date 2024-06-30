@@ -49,15 +49,20 @@ bool HyperscanPm::compile(std::string *error) {
         return false;
     }
 
-    if (hs_valid_platform() != HS_SUCCESS )
-    {
+    if (hs_valid_platform() != HS_SUCCESS ) {
         error->assign("This host does not support Hyperscan.");
+        return false;
+    }
+
+    hs_platform_info_t platform;
+    if (hs_populate_platform(&platform) != HS_SUCCESS) {
+        error->assign("Can't determine platform type for Hyperscan.");
         return false;
     }
 
     // The Hyperscan compiler takes its patterns in a group of arrays.
     std::vector<const char *> pats;
-    std::vector<unsigned> flags(num_patterns, HS_FLAG_DOTALL | HS_FLAG_MULTILINE | HS_FLAG_SOM_LEFTMOST);
+    std::vector<unsigned> flags(num_patterns, HS_FLAG_SINGLEMATCH);
     std::vector<unsigned> ids;
 
     for (const auto &p : patterns) {
@@ -66,13 +71,13 @@ bool HyperscanPm::compile(std::string *error) {
     }
 
     hs_compile_error_t *compile_error = NULL;
-    hs_error_t hs_error = hs_compile_multi(&pats[0], 
-                                            &flags[0], 
+    hs_error_t hs_error = hs_compile_multi(&pats[0],
+                                            &flags[0],
                                             &ids[0],
-                                            num_patterns, 
-                                            HS_MODE_BLOCK, 
-                                            NULL, 
-                                            &db, 
+                                            num_patterns,
+                                            HS_MODE_BLOCK,
+                                            &platform,
+                                            &db,
                                             &compile_error);
 
     if (compile_error != NULL) {
@@ -152,7 +157,7 @@ int HyperscanPm::search(const char *t, unsigned int tlen, std::vector<std::strin
         return -1;
     }
 
-    return ctx.num_matches;
+    return ctx.num_matches > 0 ? ctx.offset : -1;
 }
 
 const char *HyperscanPm::getPatternById(unsigned int patId) const {

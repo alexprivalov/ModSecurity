@@ -41,7 +41,7 @@ class HyperscanPm {
     int search(const char *t, 
                 unsigned int tlen, 
                 std::vector<std::string>& matches,
-                bool terminateAfter1stMatch = false);
+                bool terminateAfter1stMatch = true);
 
     const char *getPatternById(unsigned int patId) const;
 
